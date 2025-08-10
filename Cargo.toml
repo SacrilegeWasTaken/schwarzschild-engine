@@ -10,6 +10,7 @@ wgpu = "0.15"
 pollster = "0.3"
 winit = "0.28"
 raw-window-handle = "0.5"
+glam = "*"
 
 [dependencies]
 gpu.workspace = true
