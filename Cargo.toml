@@ -1,0 +1,32 @@
+[package]
+name = "schwarzschild-engine"
+version = "0.1.0"
+edition = "2024"
+
+[workspace.dependencies]
+engine = {path = "crates/engine"}
+gpu = {path = "crates/gpu"}
+wgpu = "0.15"
+pollster = "0.3"
+winit = "0.28"
+raw-window-handle = "0.5"
+
+[dependencies]
+gpu.workspace = true
+pollster.workspace = true
+winit.workspace = true
+wgpu.workspace = true
+
+[workspace]
+members = [
+    "crates/engine",
+    "crates/gpu"
+]
+
+[[bin]]
+name = "run"
+path = "cmd/run.rs"
+
+[[bin]]
+name = "wgpu"
+path = "cmd/wgpu.rs"

@@ -1,0 +1,12 @@
+[package]
+name = "gpu"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+path = "lib.rs"
+name = "gpu"
+
+[dependencies]
+wgpu.workspace = true
+winit.workspace = true
