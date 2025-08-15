@@ -8,3 +8,5 @@ path = "lib.rs"
 name = "engine"
 
 [dependencies]
+gpu.workspace = true
+winit.workspace = true

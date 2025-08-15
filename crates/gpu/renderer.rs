@@ -1,13 +1,11 @@
-use std::iter;
-
-use glam::Mat4;
-use wgpu::util::DeviceExt;
-use winit::window::Window;
-
 use crate::{
     Camera, Scene, Vertex,
     shaders::{FRAGMENT_SHADER, VERTEX_SHADER},
 };
+use glam::Mat4;
+use std::iter;
+use wgpu::util::DeviceExt;
+use winit::window::Window;
 
 /// Uniforms для передачи MVP
 #[repr(C)]
@@ -15,20 +13,17 @@ use crate::{
 struct Uniforms {
     mvp: [[f32; 4]; 4],
 }
-
 impl Uniforms {
     fn new() -> Self {
         Self {
             mvp: Mat4::IDENTITY.to_cols_array_2d(),
         }
     }
-
     fn from_mat4(m: Mat4) -> Self {
         Self {
             mvp: m.to_cols_array_2d(),
         }
     }
-
     fn as_byte_slice(uniforms: &[Uniforms]) -> &[u8] {
         let len = std::mem::size_of_val(uniforms);
         unsafe { std::slice::from_raw_parts(uniforms.as_ptr() as *const u8, len) }
@@ -40,24 +35,23 @@ pub struct Renderer {
     device: wgpu::Device,
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
-
     // Пайплайн и биндинги
     render_pipeline: wgpu::RenderPipeline,
     uniform_bind_group_layout: wgpu::BindGroupLayout,
-    // Пока не кешируем per-object буферы — но можно добавить HashMap.
+    // MSAA и глубина
+    msaa_texture_view: wgpu::TextureView,
+    depth_texture_view: wgpu::TextureView,
+    sample_count: u32,
 }
 
 impl Renderer {
     pub async fn new(window: &Window) -> Self {
         let size = window.inner_size();
-
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: wgpu::Backends::all(),
             dx12_shader_compiler: Default::default(),
         });
-
         let surface = unsafe { instance.create_surface(window) }.unwrap();
-
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::HighPerformance,
@@ -66,7 +60,6 @@ impl Renderer {
             })
             .await
             .expect("No adapter");
-
         let (device, queue) = adapter
             .request_device(
                 &wgpu::DeviceDescriptor {
@@ -78,7 +71,6 @@ impl Renderer {
             )
             .await
             .expect("Failed to create device");
-
         // capabilities / format
         let surface_caps = surface.get_capabilities(&adapter);
         let surface_format = surface_caps
@@ -87,7 +79,6 @@ impl Renderer {
             .copied()
             .find(|f| f.describe().srgb)
             .unwrap_or(surface_caps.formats[0]);
-
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format: surface_format,
@@ -97,8 +88,44 @@ impl Renderer {
             alpha_mode: wgpu::CompositeAlphaMode::Auto,
             view_formats: vec![],
         };
-
         surface.configure(&device, &config);
+
+        // Настройка MSAA
+        let sample_count = 4; // 4x MSAA
+
+        // Создание мультисемплированной текстуры
+        let msaa_texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("MSAA Texture"),
+            size: wgpu::Extent3d {
+                width: config.width,
+                height: config.height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count,
+            dimension: wgpu::TextureDimension::D2,
+            format: config.format,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            view_formats: &[],
+        });
+        let msaa_texture_view = msaa_texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+        // Создание текстуры глубины
+        let depth_texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("Depth Texture"),
+            size: wgpu::Extent3d {
+                width: config.width,
+                height: config.height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Depth32Float,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            view_formats: &[],
+        });
+        let depth_texture_view = depth_texture.create_view(&wgpu::TextureViewDescriptor::default());
 
         // uniform bind group layout (group 0 binding 0)
         let uniform_bind_group_layout =
@@ -115,26 +142,22 @@ impl Renderer {
                     count: None,
                 }],
             });
-
         // pipeline layout uses uniform layout
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Pipeline Layout"),
             bind_group_layouts: &[&uniform_bind_group_layout],
             push_constant_ranges: &[],
         });
-
         // shader modules
         let vs_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Vertex Shader"),
             source: wgpu::ShaderSource::Wgsl(VERTEX_SHADER.into()),
         });
-
         let fs_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Fragment Shader"),
             source: wgpu::ShaderSource::Wgsl(FRAGMENT_SHADER.into()),
         });
-
-        // render pipeline
+        // render pipeline с поддержкой MSAA и глубины
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("Render Pipeline"),
             layout: Some(&pipeline_layout),
@@ -157,8 +180,18 @@ impl Renderer {
                 cull_mode: Some(wgpu::Face::Back),
                 ..Default::default()
             },
-            depth_stencil: None, // можно добавить позже
-            multisample: wgpu::MultisampleState::default(),
+            depth_stencil: Some(wgpu::DepthStencilState {
+                format: wgpu::TextureFormat::Depth32Float,
+                depth_write_enabled: true,
+                depth_compare: wgpu::CompareFunction::Less,
+                stencil: wgpu::StencilState::default(),
+                bias: wgpu::DepthBiasState::default(),
+            }),
+            multisample: wgpu::MultisampleState {
+                count: sample_count,
+                mask: !0,
+                alpha_to_coverage_enabled: false,
+            },
             multiview: None,
         });
 
@@ -169,6 +202,9 @@ impl Renderer {
             config,
             render_pipeline,
             uniform_bind_group_layout,
+            msaa_texture_view,
+            depth_texture_view,
+            sample_count,
         }
     }
 
@@ -178,11 +214,46 @@ impl Renderer {
             self.config.width = width;
             self.config.height = height;
             self.surface.configure(&self.device, &self.config);
+
+            // Пересоздание MSAA текстуры
+            let msaa_texture = self.device.create_texture(&wgpu::TextureDescriptor {
+                label: Some("MSAA Texture"),
+                size: wgpu::Extent3d {
+                    width,
+                    height,
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: self.sample_count,
+                dimension: wgpu::TextureDimension::D2,
+                format: self.config.format,
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+                view_formats: &[],
+            });
+            self.msaa_texture_view =
+                msaa_texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+            // Пересоздание текстуры глубины
+            let depth_texture = self.device.create_texture(&wgpu::TextureDescriptor {
+                label: Some("Depth Texture"),
+                size: wgpu::Extent3d {
+                    width,
+                    height,
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: self.sample_count,
+                dimension: wgpu::TextureDimension::D2,
+                format: wgpu::TextureFormat::Depth32Float,
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+                view_formats: &[],
+            });
+            self.depth_texture_view =
+                depth_texture.create_view(&wgpu::TextureViewDescriptor::default());
         }
     }
 
-    /// Рендерить сцену с камерой. Для простоты мы при каждом объекте создаём vertex/index/uniform buffers.
-    /// Подготовка ресурсов выполняется **до** открытия RenderPass, чтобы буферы жили достаточно долго.
+    /// Рендерить сцену с камерой
     pub fn render(&mut self, scene: &Scene, camera: &Camera) {
         let frame = match self.surface.get_current_texture() {
             Ok(frame) => frame,
@@ -195,16 +266,14 @@ impl Renderer {
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
 
-        // Вспомогательная структура, содержащая GPU-ресурсы, которые должны жить дольше RenderPass
+        // Вспомогательная структура для GPU-ресурсов
         struct ObjGpu {
             vertex_buffer: wgpu::Buffer,
             index_buffer: wgpu::Buffer,
             bind_group: wgpu::BindGroup,
             index_count: u32,
         }
-
         let mut objs_gpu: Vec<ObjGpu> = Vec::with_capacity(scene.objects().len());
-
         let aspect = self.config.width as f32 / self.config.height as f32;
         let view_mat = camera.view_matrix();
         let proj_mat = camera.projection_matrix(aspect);
@@ -223,7 +292,7 @@ impl Renderer {
                     usage: wgpu::BufferUsages::VERTEX,
                 });
 
-            // index buffer (u16 -> u8 slice)
+            // index buffer
             let index_buffer = self
                 .device
                 .create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -231,7 +300,7 @@ impl Renderer {
                     contents: unsafe {
                         std::slice::from_raw_parts(
                             indices.as_ptr() as *const u8,
-                            size_of_val(indices),
+                            std::mem::size_of_val(indices),
                         )
                     },
                     usage: wgpu::BufferUsages::INDEX,
@@ -241,7 +310,6 @@ impl Renderer {
             let model = obj.model_matrix();
             let mvp = proj_mat * view_mat * model;
             let uniforms = Uniforms::from_mat4(mvp);
-
             let uniform_buffer =
                 self.device
                     .create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -267,7 +335,7 @@ impl Renderer {
             });
         }
 
-        // Теперь безопасно открыть render pass и отрисовать подготовленные объекты
+        // Создание командного энкодера и прохода рендеринга
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -278,8 +346,8 @@ impl Renderer {
             let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Main Render Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &view,
-                    resolve_target: None,
+                    view: &self.msaa_texture_view, // Рендеринг в MSAA текстуру
+                    resolve_target: Some(&view),   // Разрешение в основную текстуру
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
                             r: 0.1,
@@ -290,12 +358,19 @@ impl Renderer {
                         store: true,
                     },
                 })],
-                depth_stencil_attachment: None,
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: &self.depth_texture_view,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(1.0),
+                        store: true,
+                    }),
+                    stencil_ops: None,
+                }),
             });
 
             rpass.set_pipeline(&self.render_pipeline);
 
-            // Теперь проходим по подготовленным GPU-объектам и рисуем
+            // Отрисовка всех объектов
             for obj_gpu in objs_gpu.iter() {
                 rpass.set_bind_group(0, &obj_gpu.bind_group, &[]);
                 rpass.set_vertex_buffer(0, obj_gpu.vertex_buffer.slice(..));
@@ -304,7 +379,7 @@ impl Renderer {
             }
         }
 
-        // submit + present
+        // Отправка команд и презентация кадра
         self.queue.submit(iter::once(encoder.finish()));
         frame.present();
     }

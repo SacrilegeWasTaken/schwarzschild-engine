@@ -17,6 +17,7 @@ gpu.workspace = true
 pollster.workspace = true
 winit.workspace = true
 wgpu.workspace = true
+engine.workspace = true
 
 [workspace]
 members = [

@@ -3,9 +3,11 @@ mod shaders;
 mod vertex;
 
 pub use glam::*;
+pub use pollster::*;
 pub use renderer::Renderer;
 pub use shaders::{FRAGMENT_SHADER, VERTEX_SHADER};
 pub use vertex::Vertex;
+pub use winit::*;
 
 /// Трейт объекта сцены
 pub trait Object {
@@ -15,6 +17,8 @@ pub trait Object {
     fn indices(&self) -> &[u16];
     /// модельная матрица (локальная -> мировая)
     fn model_matrix(&self) -> Mat4;
+
+    fn to_object3d(self) -> Object3D;
 }
 
 pub struct Object3D {
@@ -42,13 +46,14 @@ impl Object3D {
     }
 }
 
+#[derive(Default)]
 pub struct Scene {
     objects: Vec<Object3D>,
 }
 
 impl Scene {
     pub fn new() -> Self {
-        Self { objects: vec![] }
+        Self::default()
     }
     pub fn add_object(&mut self, obj: Object3D) {
         self.objects.push(obj);
