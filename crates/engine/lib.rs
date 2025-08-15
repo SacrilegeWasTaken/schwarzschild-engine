@@ -4,7 +4,7 @@ mod movement;
 use std::time::Instant;
 
 use gpu::{
-    Camera, Object3D, Renderer, Scene, Vec3,
+    Camera, Object, Object3D, Renderer, Scene, Vec3,
     event::{DeviceEvent, ElementState, Event, MouseButton, WindowEvent},
     event_loop::ControlFlow,
     window::Window,
@@ -49,8 +49,8 @@ impl SchwarzEngine {
         }
     }
 
-    pub fn add_object_to_scene(&mut self, obj: Object3D) {
-        self.scene.add_object(obj);
+    pub fn add_object_to_scene(&mut self, obj: impl Object) {
+        self.scene.add_object(obj.to_object3d());
     }
 
     pub fn render<T>(&mut self, event: Event<'_, T>, control_flow: &mut ControlFlow) {
