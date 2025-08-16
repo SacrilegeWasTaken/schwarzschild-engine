@@ -1,50 +1,12 @@
 mod renderer;
 mod shaders;
-mod vertex;
 
 pub use glam::*;
 pub use pollster::*;
 pub use renderer::Renderer;
 pub use shaders::{FRAGMENT_SHADER, VERTEX_SHADER};
-pub use vertex::Vertex;
+pub use utilities::prelude::*;
 pub use winit::*;
-
-/// Трейт объекта сцены
-pub trait Object {
-    /// вершины в локальных координатах
-    fn vertices(&self) -> &[Vertex];
-    /// индексы (триангулированные, u16)
-    fn indices(&self) -> &[u16];
-    /// модельная матрица (локальная -> мировая)
-    fn model_matrix(&self) -> Mat4;
-
-    fn to_object3d(self) -> Object3D;
-}
-
-pub struct Object3D {
-    vertices: Vec<Vertex>,
-    indices: Vec<u16>,
-    model_matrix: Mat4,
-}
-
-impl Object3D {
-    pub fn new(vertices: Vec<Vertex>, indices: Vec<u16>, model_matrix: Mat4) -> Self {
-        Self {
-            vertices,
-            indices,
-            model_matrix,
-        }
-    }
-    pub fn vertices(&self) -> &[Vertex] {
-        &self.vertices
-    }
-    pub fn indices(&self) -> &[u16] {
-        &self.indices
-    }
-    pub fn model_matrix(&self) -> Mat4 {
-        self.model_matrix
-    }
-}
 
 #[derive(Default)]
 pub struct Scene {

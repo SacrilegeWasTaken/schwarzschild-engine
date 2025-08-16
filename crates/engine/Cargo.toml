@@ -10,3 +10,4 @@ name = "engine"
 [dependencies]
 gpu.workspace = true
 winit.workspace = true
+utilities.workspace = true

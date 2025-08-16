@@ -1,5 +1,9 @@
 use std::mem::size_of_val;
 
+use glam::Mat4;
+
+use crate::traits::Object;
+
 /// Описание вершины для 3D: позиция (vec3) + цвет (vec3)
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
@@ -35,5 +39,48 @@ impl Vertex {
     pub fn as_byte_slice(vertices: &[Vertex]) -> &[u8] {
         let byte_len = size_of_val(vertices);
         unsafe { std::slice::from_raw_parts(vertices.as_ptr() as *const u8, byte_len) }
+    }
+}
+
+pub struct Object3D {
+    vertices: Vec<Vertex>,
+    indices: Vec<u16>,
+    model_matrix: Mat4,
+}
+
+impl Object3D {
+    pub fn new(vertices: Vec<Vertex>, indices: Vec<u16>, model_matrix: Mat4) -> Self {
+        Self {
+            vertices,
+            indices,
+            model_matrix,
+        }
+    }
+    pub fn vertices(&self) -> &[Vertex] {
+        &self.vertices
+    }
+    pub fn indices(&self) -> &[u16] {
+        &self.indices
+    }
+    pub fn model_matrix(&self) -> Mat4 {
+        self.model_matrix
+    }
+}
+
+impl Object for Object3D {
+    fn vertices(&self) -> &[Vertex] {
+        &self.vertices
+    }
+
+    fn indices(&self) -> &[u16] {
+        &self.indices
+    }
+
+    fn model_matrix(&self) -> Mat4 {
+        self.model_matrix
+    }
+
+    fn to_object3d(self) -> Object3D {
+        self
     }
 }
