@@ -83,4 +83,12 @@ impl Object for Object3D {
     fn to_object3d(self) -> Object3D {
         self
     }
+
+    fn translate(&mut self, offset: glam::Vec3) {
+        self.model_matrix = Mat4::from_translation(offset) * self.model_matrix;
+    }
+
+    fn scale(&mut self, factor: glam::Vec3) {
+        self.model_matrix = Mat4::from_scale(factor) * self.model_matrix;
+    }
 }

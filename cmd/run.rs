@@ -19,8 +19,15 @@ fn main() {
     let triangle = Triangle::new(Mat4::IDENTITY);
     let grid = Grid::new(100, 0.5, 0.01, Mat4::IDENTITY);
 
+    let mut obj = utilities::obj_import::load_obj("resources/mercedes_ponos.obj", Mat4::IDENTITY)
+        .expect("obj load error");
+
+    obj.translate(Vec3::new(10f32, 0f32, 10f32));
+    obj.scale(Vec3::new(0.33, 0.33, 0.33));
+
     engine.add_object_to_scene(grid);
     engine.add_object_to_scene(triangle);
+    engine.add_object_to_scene(obj);
 
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;

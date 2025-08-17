@@ -24,6 +24,7 @@ winit.workspace = true
 wgpu.workspace = true
 engine.workspace = true
 tobj.workspace = true
+utilities.workspace = true
 
 [workspace]
 members = [

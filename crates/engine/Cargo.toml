@@ -11,3 +11,4 @@ name = "engine"
 gpu.workspace = true
 winit.workspace = true
 utilities.workspace = true
+glam.workspace = true

@@ -26,6 +26,14 @@ impl Object for Triangle {
             self.model_matrix,
         )
     }
+
+    fn translate(&mut self, offset: glam::Vec3) {
+        self.model_matrix = Mat4::from_translation(offset) * self.model_matrix;
+    }
+
+    fn scale(&mut self, factor: glam::Vec3) {
+        self.model_matrix = Mat4::from_scale(factor) * self.model_matrix;
+    }
 }
 
 impl Triangle {
@@ -80,6 +88,14 @@ impl Object for Grid {
 
     fn model_matrix(&self) -> Mat4 {
         self.model_matrix
+    }
+
+    fn translate(&mut self, offset: glam::Vec3) {
+        self.model_matrix = Mat4::from_translation(offset) * self.model_matrix;
+    }
+
+    fn scale(&mut self, factor: glam::Vec3) {
+        self.model_matrix = Mat4::from_scale(factor) * self.model_matrix;
     }
 }
 
