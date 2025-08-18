@@ -9,6 +9,7 @@ use crate::traits::Object;
 #[derive(Copy, Clone, Debug)]
 pub struct Vertex {
     pub position: [f32; 3],
+    pub normal: [f32; 3],
     pub color: [f32; 3],
 }
 
@@ -25,10 +26,16 @@ impl Vertex {
                     shader_location: 0,
                     format: wgpu::VertexFormat::Float32x3,
                 },
-                // color @location(1)
+                // normal @location(1)
                 wgpu::VertexAttribute {
                     offset: mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
                     shader_location: 1,
+                    format: wgpu::VertexFormat::Float32x3,
+                },
+                // color @location(2)
+                wgpu::VertexAttribute {
+                    offset: (mem::size_of::<[f32; 3]>() * 2) as wgpu::BufferAddress,
+                    shader_location: 2,
                     format: wgpu::VertexFormat::Float32x3,
                 },
             ],
@@ -44,26 +51,17 @@ impl Vertex {
 
 pub struct Object3D {
     vertices: Vec<Vertex>,
-    indices: Vec<u16>,
+    indices: Vec<u32>,
     model_matrix: Mat4,
 }
 
 impl Object3D {
-    pub fn new(vertices: Vec<Vertex>, indices: Vec<u16>, model_matrix: Mat4) -> Self {
+    pub fn new(vertices: Vec<Vertex>, indices: Vec<u32>, model_matrix: Mat4) -> Self {
         Self {
             vertices,
             indices,
             model_matrix,
         }
-    }
-    pub fn vertices(&self) -> &[Vertex] {
-        &self.vertices
-    }
-    pub fn indices(&self) -> &[u16] {
-        &self.indices
-    }
-    pub fn model_matrix(&self) -> Mat4 {
-        self.model_matrix
     }
 }
 
@@ -72,7 +70,7 @@ impl Object for Object3D {
         &self.vertices
     }
 
-    fn indices(&self) -> &[u16] {
+    fn indices(&self) -> &[u32] {
         &self.indices
     }
 

@@ -4,7 +4,7 @@ mod movement;
 use std::time::Instant;
 
 use gpu::{
-    Camera, Object, Object3D, Renderer, Scene, Vec3,
+    Camera, Object, Renderer, Scene, Vec3,
     event::{DeviceEvent, ElementState, Event, MouseButton, WindowEvent},
     event_loop::ControlFlow,
     window::Window,

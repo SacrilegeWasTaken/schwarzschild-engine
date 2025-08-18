@@ -4,6 +4,7 @@ use crate::{
 };
 use glam::Mat4;
 use std::iter;
+use utilities::traits::Object;
 use wgpu::util::DeviceExt;
 use winit::window::Window;
 
@@ -14,6 +15,7 @@ struct Uniforms {
     mvp: [[f32; 4]; 4],
 }
 impl Uniforms {
+    #[allow(dead_code)]
     fn new() -> Self {
         Self {
             mvp: Mat4::IDENTITY.to_cols_array_2d(),
@@ -374,7 +376,7 @@ impl Renderer {
             for obj_gpu in objs_gpu.iter() {
                 rpass.set_bind_group(0, &obj_gpu.bind_group, &[]);
                 rpass.set_vertex_buffer(0, obj_gpu.vertex_buffer.slice(..));
-                rpass.set_index_buffer(obj_gpu.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+                rpass.set_index_buffer(obj_gpu.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
                 rpass.draw_indexed(0..obj_gpu.index_count, 0, 0..1);
             }
         }
